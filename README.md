@@ -14,7 +14,7 @@
 
 ## Documentation
 
-- This is a collection of APIs mostly designed to be used together. The two main sources of documentation are this [README.md](./README.md) and the [Typedoc generated](./docs/modules.md) documentation.
+- This is a collection of APIs mostly designed to be used together. The two main sources of documentation are this [README.md](./README.md) and the [Typedoc generated](./docs/globals.md) documentation.
 - This readme is meant to be an <strong>overview</strong> of this project while the documentation will be expanded at a later date.
 
 
