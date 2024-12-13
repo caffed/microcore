@@ -6,26 +6,48 @@ import type {
   InlineBlocks,
 } from '../types';
 import {
+  arrayContentsRegex,
   blockCommentRegEx,
   clamp,
   colorCode,
   createNamespacedRecord,
+  createProxy,
   createTimeStamp,
+  enumToArray,
   fakeUuid,
   filterUndefinedFromObject,
   hexToUtf,
   interpolate,
   jsonObjectCopy,
-  keyValToObject,
-  createProxy,
+  lineCommentRegEx,
   objectToSearchParams,
   randomHexString,
   randomInteger,
   randomString,
+  removeComments,
   removeWhitespace,
+  searchParamsToObject,
+  updateConstObject,
+  utfToHex,
 } from './utils';
 
 describe('utils', () => {
+  describe('arrayContentsRegex', () => {
+    it('should match a string with opening and closing brackets', async () => {
+      chaiExpect('[]'.match(arrayContentsRegex)).to.not.be.null;
+    });
+
+    it('should match a string with opening and closing brackets and text in between', async () => {
+      chaiExpect(`[${randomString()}]`.match(arrayContentsRegex)).to.not.be.null;
+    });
+
+    it('should not match a string without opening and closing brackets', async () => {
+      chaiExpect(`${randomString()}`.match(arrayContentsRegex)).to.be.null;
+      chaiExpect(`[${randomString()}`.match(arrayContentsRegex)).to.be.null;
+      chaiExpect(`${randomString()}]`.match(arrayContentsRegex)).to.be.null;
+    });
+  });
+
   describe('blockCommentRegEx', () => {
     it('should match an inline block comment with no whitespace', async () => {
       chaiExpect('/**/'.match(blockCommentRegEx)).to.not.be.null;
@@ -159,6 +181,15 @@ describe('utils', () => {
     });
   });
 
+  describe('enumToArray', () => {
+    enum TEST {
+      ONE,
+      TWO,
+    }
+    const TEST_ARRAY = enumToArray(TEST);
+    chaiExpect(TEST_ARRAY).to.include('ONE', 'TWO');
+  });
+
   describe('fakeUuid', () => {
     it('should return as a valid UUID formated string', async () => {
       const id = fakeUuid();
@@ -273,13 +304,18 @@ describe('utils', () => {
     });
   });
 
-  describe('keyValToObject', () => {
-    it('should ', async () => {
-      const key = randomString(10, { filterRegex: /[0-9]/g });
-      const val = randomString();
+  describe('lineCommentRegEx', () => {
+    it('should match a string with two consecutive forward slashes', async () => {
+      chaiExpect('//'.match(lineCommentRegEx)).to.not.be.null;
+    });
 
-      const obj = keyValToObject(`${key}=${val}`);
-      chaiExpect(obj).to.have.key(key);
+    it('should match a string with two consecutive forward slashes and text aftwards', async () => {
+      chaiExpect(`//${randomString()}`.match(lineCommentRegEx)).to.not.be.null;
+    });
+
+    it('should not match a string without two consecutive forward slashes', async () => {
+      chaiExpect(`/`.match(lineCommentRegEx)).to.be.null;
+      chaiExpect(`/${randomString()}`.match(lineCommentRegEx)).to.be.null;
     });
   });
 
@@ -302,7 +338,7 @@ describe('utils', () => {
   });
 
   describe('objectToSearchParams', () => {
-    // 2 levels
+    // 2 levelsshould take an even hex character string
     // convert to strings
     let keyone: string, keytwo: string, val: string;
 
@@ -386,9 +422,45 @@ describe('utils', () => {
     });
   });
 
-  /**
-   * @name removeWhitespace
-   */
+  describe('removeComments', () => {
+    let allCommentedString: string, blockCommentedString: string, lineCommentedString: string, str: string, unCommentedString: string;
+
+    beforeEach(() => {
+      str = randomString();
+      blockCommentedString = `
+        /*
+          comment
+        */
+       ${str}
+      `;
+      lineCommentedString = `
+      // comment
+      ${str}
+      `;
+      allCommentedString = `
+        ${blockCommentedString}
+        ${lineCommentedString}
+      `;
+      unCommentedString = `${str}`;
+    });
+
+    it('should remove line comments', async () => {
+      chaiExpect(removeComments(lineCommentedString)).to.include(str);
+    });
+
+    it('should remove block comments', async () => {
+      chaiExpect(removeComments(blockCommentedString)).to.include(str);
+    });
+
+    it('should remove both line and block comments', async () => {
+      chaiExpect(removeComments(allCommentedString)).to.include(str);
+    });
+
+    it('should not remove uncommented text', async () => {
+      chaiExpect(removeComments(unCommentedString)).to.include(str);
+    });
+  });
+
   describe('removeWhitespace', function () {
     const correctString = 'test string';
 
@@ -403,6 +475,54 @@ describe('utils', () => {
     it('should not affect correctly formatted string', async () => {
       const noopString = 'test string';
       chaiExpect(removeWhitespace(noopString)).to.eq(noopString);
+    });
+  });
+
+  describe('searchParamsToObject', () => {
+    it('should convert a URLSearchParams instance to a plain object', async () => {
+      const keyOne = randomString(10, { filterRegex: /[0-9]/g });
+      const keyTwo = randomString(10, { filterRegex: /[0-9]/g });
+      const valOne = randomString();
+      const valTwo = randomString();
+      const urlParams = new URLSearchParams(`${keyOne}=${valOne}&${keyTwo}=${valTwo}`);
+      const paramsObject = searchParamsToObject(urlParams);
+      chaiExpect(paramsObject).to.have.keys(keyOne, keyTwo);
+      chaiExpect(paramsObject[keyOne]).to.eq(valOne);
+      chaiExpect(paramsObject[keyTwo]).to.eq(valTwo);
+    });
+
+    it('should convert a two level URLSearchParams instance to a plain object', async () => {
+      const keyOne = randomString(10, { filterRegex: /[0-9]/g });
+      const keyTwo = randomString(10, { filterRegex: /[0-9]/g });
+      const valOne = randomString();
+      const urlParams = new URLSearchParams(`${keyOne}.${keyTwo}=${valOne}`);
+      const paramsObject = searchParamsToObject(urlParams);
+      chaiExpect(paramsObject).to.have.keys(keyOne);
+      chaiExpect(paramsObject).to.not.have.keys(keyTwo);
+      chaiExpect(paramsObject[keyOne][keyTwo]).to.eq(valOne);
+    });
+  });
+
+  describe('updateConstObject', () => {
+    it('should update properties in destination object from source object', async () => {
+      const keyOne = randomString(10, { filterRegex: /[0-9]/g });
+      const valOne = randomString();
+      const valTwo = randomString();
+      const target = {
+        [keyOne]: valOne,
+      };
+      const src = {
+        [keyOne]: valTwo,
+      };
+      updateConstObject(target, src);
+      chaiExpect(target[keyOne]).to.eq(valTwo);
+    });
+  });
+
+  describe('utfToHex', () => {
+    it('should convert UTF16 text to hexidecimal base16', async () => {
+      // taken from ASCII table https://en.wikipedia.org/wiki/ASCII
+      chaiExpect(utfToHex('TEST')).to.eq('54455354');
     });
   });
 });

@@ -121,10 +121,12 @@ export const defaultLineTemplate = (
     timeStamp,
   } = params;
   const bracketInfo = [
-    timeStamp.formatted,
-    level.toUpperCase(),
-    prefix,
-  ].filter(Boolean).join(' | ');
+      timeStamp.formatted,
+      level.toUpperCase(),
+      prefix,
+    ]
+    .filter(Boolean)
+    .join(' | ');
   return [
     `${escapeStart}[${bracketInfo}]:`,
     JSON.stringify(args, null, 2),

@@ -9,7 +9,7 @@
   - This project follows the 80/20 adage in supporting 20% of the features you use 80% of the time and will never be as featureful as dedicated projects for specific domains.
   - Most modules provide an API with middleware for extension.
 - How?
-  - This expectation for users of this library is that the source and tests will be used primarily for documentation. As time permits, I will add more verbose documentation and examples.  
+  - Currently, the best documentation is the source and tests in this package. As time permits, I will add more verbose documentation and examples.  
 
 
 ## Documentation

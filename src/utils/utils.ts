@@ -12,6 +12,20 @@ import {
   TaggedFunctionStrings,
 } from '../types';
 
+
+/**
+ * Name: arrayContentsRegex
+ * Description: Regex for getting contents within brackets [content] => 'content'
+ */
+export const arrayContentsRegex = /(?<=\[\s*).*?(?=\s*\])/gs;
+
+/**
+ * Name: blockCommentRegEx
+ * Description: Regex that removes block comments
+ * @public
+ */
+export const blockCommentRegEx = /\/\*([^)]{0,})\*\//gm;
+
 /**
  * Name: clamp
  * Desciption: Simple number clamp
@@ -22,10 +36,10 @@ import {
  * @returns number
  */
 export const clamp = (
-  val: number,
-  min: number,
-  max: number
-): number => {
+  val: number | bigint,
+  min: number | bigint,
+  max: number | bigint
+): number | bigint => {
   return val <= min ?
     min :
       val >= max ?
@@ -108,20 +122,28 @@ export const createNamespacedRecord = (obj: AnyObject, delimeter = '/'): AnyObje
 };
 
 /**
+ * Name: createProxy
+ * Description: Typed proxy constructor
+ * @public
+ * @param handler
+ * @returns (target) => ProxyHandler
+ */
+export const createProxy = <
+  T extends AnyObject = AnyObject
+>(handler: ProxyHandler<T>) => {
+  return (target: T): ProxyHandler<T> => {
+    return new Proxy<T>(target, handler);
+  };
+};
+
+/**
  * Name: defaultTimeStampFormatter
  * Description: SQLite format YYYY-MM-DDTHH:MM:SS.SSS https://www.sqlite.org/lang_datefunc.html
  * @private
  * @returns string
  */
 const defaultTimeStampFormatter = (date: Date): string => {
-  const year = date.getFullYear();
-  const month = date.getMonth() + 1;
-  const day = date.getDate();
-  const hours = date.getHours();
-  const minutes = date.getMinutes();
-  const seconds = date.getSeconds();
-  const ms = date.getMilliseconds();
-  return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}:${ms}`;
+  return date.toJSON();
 };
 
 /**
@@ -264,214 +286,11 @@ export const jsonObjectCopy = <
 };
 
 /**
- * Name: arrayContentsRegex
- * Description: Regex for getting contents within brackets [content]
- */
-export const arrayContentsRegex = /(?<=\[\s*).*?(?=\s*\])/gs;
-
-/**
- * Name: keyValObjOptions
- * Description: Object serializtion parameters
- * @private
- * @typedef {Object}
- * @property {T} AnyObject
- * @property {RegExp} 
- * @property {typeof Function} callback
- * @property {string} delimeter
- * @property {string} objectNotation
- * @property {any} prefix
- * @property {string} separator
- */
-type keyValObjOptions<T = AnyObject> = {
-  accumulator?: T;
-  arrayRegex?: RegExp;
-  callback?: Callable<any, any>;
-  delimeter?: string;
-  objectNotation?: string;
-  prefix?: any;
-  separator?: string;
-};
-
-/**
- * Name: keyValToObject
- * Description: Recursively converts a key=val string to an object\
+ * Name: lineCommentRegEx
+ * Description: Regex that removes line comments
  * @public
- * @param str key=val string 
- * @param options keyValObjOptions
- * @returns AnyObject
  */
-export const keyValToObject = (
-  str: string,
-  options: keyValObjOptions<AnyObject> = {},
-): AnyObject => {
-  const  {
-    accumulator = {},
-    callback = jsonStringToPrimitiveType,
-    delimeter = '&',
-    objectNotation = '.',
-    separator = '=',
-  } = options;
-  return str
-    .split(delimeter)
-    .reduce((acc: AnyObject, current: string) => {
-      const [key, val] = current.split(separator);
-      /**
-       * key is in one of these formats:
-       * - flat key: a
-       * - nested object key: a.b
-       * - nested array key: a.[0].b...n
-       */
-      if (key.includes(objectNotation)) {
-        const [currentKey, ...subKeys] = key.split(objectNotation);
-        const arrayIndex = currentKey.match(arrayContentsRegex);
-        if (arrayIndex) {
-          // currentKey is in format [0..n]
-        } else {
-          // currentKey is in alphanumeric format
-          acc[currentKey] = keyValToObject(
-            [subKeys.join(objectNotation), val].join(separator), {
-              accumulator: accumulator[currentKey],
-              delimeter,
-              objectNotation,
-              separator,
-            },
-          );
-        }
-
-      } else {
-        const value = callback(val);
-        acc[key] = acc[key] ?
-          acc[key] instanceof Array ?
-            acc[key].concat(value) :
-            [acc[key], value] :
-          value;
-      }
-      return acc;
-    }, accumulator);
-};
-
-/**
- * Name: JSONStringPrimitive
- * Description: helper for coverting JSON text values to primitives
- * @private
- * @typedef {null | boolean | string | number | bigint}
- */
-type JSONStringPrimitive = 
-  | null
-  | boolean
-  | string
-  | number
-  | bigint;
-
-/**
- * Name: jsonStringToPrimitiveType
- * Description: Helper function for converting strings into primitives
- * @public
- * @param str 
- * @returns JSONStringPrimitive
- */
-export const jsonStringToPrimitiveType = (str: string): JSONStringPrimitive => {
-  try {
-    switch(true) {
-      case str === 'null': {
-        return null;
-      }
-      case str === 'true': {
-        return true;
-      }
-      case str === 'false': {
-        return false;
-      }
-      case !isNaN(<any>str): {
-        return Number(str);
-      }
-      case Boolean(str.match(/(?:[+-])?([0-9]{1,})(n)/)): {
-        return BigInt(str);
-      }
-      default: {
-        return str;
-      }
-    }
-  } catch(_: any) {
-    return str;
-  }
-};
-
-/**
- * Name: primitiveToJsonString
- * Description: Helper function for converting primitives into strings
- * @public
- * @param any
- * @returns string
- */
-export const primitiveToJsonString = (val: any): any => {
-  switch(true) {
-    case val === undefined: {
-      return 'null';
-    }
-    default: {
-      return String(val);
-    }
-  }
-};
-
-/**
- * Name: createProxy
- * Description: Typed proxy constructor
- * @public
- * @param handler
- * @returns (target) => ProxyHandler
- */
-export const createProxy = <
-  T extends AnyObject = AnyObject
->(handler: ProxyHandler<T>) => {
-  return (target: T): ProxyHandler<T> => {
-    return new Proxy<T>(target, handler);
-  };
-};
-
-/**
- * Name: objectToKeyVal
- * Description: Recursively converts an object to key=val string
- * @public
- * @param obj 
- * @param options 
- * @returns string
- */
-export const objectToKeyVal = (
-  obj: AnyObject,
-  options: keyValObjOptions<string[]> = {},
-): string => {
-  const  {
-    accumulator = [],
-    callback = primitiveToJsonString,
-    delimeter = '&',
-    objectNotation = '.',
-    prefix = [],
-    separator = '=',
-  } = options;
-
-  return Reflect.ownKeys(obj)
-    .reduce((acc: string[], current: string) => {
-      if (obj[current] instanceof Array) {
-        return acc.concat(obj[current].reduce((innerAcc: any[], innerCurrent: any) => {
-          return innerAcc.concat(`${prefix.concat(current).join(objectNotation)}${separator}${callback(innerCurrent)}`);
-        }, []));
-      } else if (typeof obj[current] === 'object') {
-        //
-        return acc.concat(objectToKeyVal(obj[current], {
-          accumulator: [],
-          delimeter, 
-          objectNotation,
-          prefix: prefix.concat(current),
-          separator,
-        }));
-      } else {
-        return acc.concat(`${prefix.concat(current).join(objectNotation)}${separator}${callback(obj[current])}`);
-      }
-    }, accumulator)
-    .join(delimeter);
-};
+export const lineCommentRegEx = /\/\/.*/gm;
 
 /**
  * Name: objectToSearchParams
@@ -578,6 +397,18 @@ export const randomString = (length = 20, { prefix = '', filterRegex }: randomSt
 };
 
 /**
+ * Name: removeComments
+ * Description: remove line and block comments from strings
+ * @param str String to parse
+ * @returns string that has been filtered
+ */
+export const removeComments = (str: string): string => {
+  return str
+    .replace(blockCommentRegEx, '')
+    .replace(lineCommentRegEx, '');
+};
+
+/**
  * Name: removeWhitespace
  * Description: Normalizes whitespsace in a string
  * @public
@@ -614,32 +445,6 @@ export const searchParamsToObject = (searchParams: URLSearchParams) => {
     }
   }
   return params;
-};
-
-/**
- * Name: blockCommentRegEx
- * Description: Regex that removes block comments
- * @public
- */
-export const blockCommentRegEx = /\/\*([^)]{0,})\*\//gm;
-
-/**
- * Name: lineCommentRegEx
- * Description: Regex that removes line comments
- * @public
- */
-export const lineCommentRegEx = /\/\/.*/gm;
-
-/**
- * Name: stripComments
- * Description: remove line and block comments from strings
- * @param str String to parse
- * @returns string that has been filtered
- */
-export const stripComments = (str: string): string => {
-  return str
-    .replace(blockCommentRegEx, '')
-    .replace(lineCommentRegEx, '');
 };
 
 /**

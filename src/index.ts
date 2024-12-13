@@ -10,3 +10,4 @@ export * from './reducer';
 export * from './resource';
 export * from './utils';
 export * from './urlmanager';
+export * from './types';

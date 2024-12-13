@@ -32,6 +32,16 @@ interface AnyObject<T = any> {
 type Json = string | number | boolean | null | Json[] | {
     [key: string]: Json;
 };
+type JsonObject<T extends Json, K extends keyof T> = Pick<T, K>;
+/**
+ * Types used for event listener callbacks
+ */
+type Listener<T = any> = {
+    handler: Handler<T>;
+    options?: AnyObject<T>;
+};
+type Handler<T = any> = (...data: T[]) => T | void;
+type Operator<T = any> = (...data: T[]) => Iterable<T | void>;
 /**
  * Tagged template literal function parsing types. eg: const result = myTagFunction`template ${variable}`
  * Usage:
@@ -87,8 +97,15 @@ type Constructable<P = any, V = any> = P extends never | null | undefined ? new 
  *  - Either `function() : Promise<R> {}` or the class constructor or method returns a promise.
  */
 type ArrowFunction = Callable<null, any> | Callable<any, any> | Callable<any[], any>;
+type AsyncArrowFunction = Callable<null, Promise<any>> | Callable<any, Promise<any>> | Callable<any[], Promise<any>>;
 type ConstructorFunction = Constructable<null, any> | Constructable<any, any> | Constructable<any[], any>;
+type AsyncConstructorFunction = Constructable<null, Promise<any>> | Constructable<any, Promise<any>> | Constructable<any[], Promise<any>>;
 type CompareFunction<A, B = A> = Callable<any[], number> | Callable<[A, B], number>;
+type NumericRange<start extends number, end extends number, arr extends unknown[] = [], acc extends number = never> = arr['length'] extends end ? acc | start | end : NumericRange<start, end, [...arr, 1], arr[start] extends undefined ? acc : acc | arr['length']>;
+/**
+ * Rewrtitten from
+ */
+type TruncateString<T extends string, N extends number, L extends any[] = [], S extends string = ""> = N extends L['length'] ? S : T extends `${infer F}${infer R}` ? TruncateString<R, N, [0, ...L], `${S}${F}`> : S;
 type State<T extends Json = Json> = {
     revisionId: string;
     value: T;
@@ -1427,6 +1444,17 @@ declare const createResource: <T = any>(defaultParams: CreateResourceParams<T>) 
  */
 
 /**
+ * Name: arrayContentsRegex
+ * Description: Regex for getting contents within brackets [content] => 'content'
+ */
+declare const arrayContentsRegex: RegExp;
+/**
+ * Name: blockCommentRegEx
+ * Description: Regex that removes block comments
+ * @public
+ */
+declare const blockCommentRegEx: RegExp;
+/**
  * Name: clamp
  * Desciption: Simple number clamp
  * @public
@@ -1435,7 +1463,7 @@ declare const createResource: <T = any>(defaultParams: CreateResourceParams<T>) 
  * @param max
  * @returns number
  */
-declare const clamp: (val: number, min: number, max: number) => number;
+declare const clamp: (val: number | bigint, min: number | bigint, max: number | bigint) => number | bigint;
 /**
  * Name: colorCodes
  * Description: ANSI color code wrapper
@@ -1467,6 +1495,14 @@ declare const colorEscapeCodes: Record<string, string>;
  * @returns AnyObject
  */
 declare const createNamespacedRecord: (obj: AnyObject, delimeter?: string) => AnyObject;
+/**
+ * Name: createProxy
+ * Description: Typed proxy constructor
+ * @public
+ * @param handler
+ * @returns (target) => ProxyHandler
+ */
+declare const createProxy: <T extends AnyObject = AnyObject<any>>(handler: ProxyHandler<T>) => (target: T) => ProxyHandler<T>;
 /**
  * Name: TimeStamp
  * Description: Timestamp return typedef
@@ -1538,81 +1574,11 @@ declare const isNode: () => boolean;
  */
 declare const jsonObjectCopy: <T extends object, K extends keyof T, O extends Json = Json>(value: T) => Record<K, O>;
 /**
- * Name: arrayContentsRegex
- * Description: Regex for getting contents within brackets [content]
- */
-declare const arrayContentsRegex: RegExp;
-/**
- * Name: keyValObjOptions
- * Description: Object serializtion parameters
- * @private
- * @typedef {Object}
- * @property {T} AnyObject
- * @property {RegExp}
- * @property {typeof Function} callback
- * @property {string} delimeter
- * @property {string} objectNotation
- * @property {any} prefix
- * @property {string} separator
- */
-type keyValObjOptions<T = AnyObject> = {
-    accumulator?: T;
-    arrayRegex?: RegExp;
-    callback?: Callable<any, any>;
-    delimeter?: string;
-    objectNotation?: string;
-    prefix?: any;
-    separator?: string;
-};
-/**
- * Name: keyValToObject
- * Description: Recursively converts a key=val string to an object\
+ * Name: lineCommentRegEx
+ * Description: Regex that removes line comments
  * @public
- * @param str key=val string
- * @param options keyValObjOptions
- * @returns AnyObject
  */
-declare const keyValToObject: (str: string, options?: keyValObjOptions<AnyObject>) => AnyObject;
-/**
- * Name: JSONStringPrimitive
- * Description: helper for coverting JSON text values to primitives
- * @private
- * @typedef {null | boolean | string | number | bigint}
- */
-type JSONStringPrimitive = null | boolean | string | number | bigint;
-/**
- * Name: jsonStringToPrimitiveType
- * Description: Helper function for converting strings into primitives
- * @public
- * @param str
- * @returns JSONStringPrimitive
- */
-declare const jsonStringToPrimitiveType: (str: string) => JSONStringPrimitive;
-/**
- * Name: primitiveToJsonString
- * Description: Helper function for converting primitives into strings
- * @public
- * @param any
- * @returns string
- */
-declare const primitiveToJsonString: (val: any) => any;
-/**
- * Name: createProxy
- * Description: Typed proxy constructor
- * @public
- * @param handler
- * @returns (target) => ProxyHandler
- */
-declare const createProxy: <T extends AnyObject = AnyObject<any>>(handler: ProxyHandler<T>) => (target: T) => ProxyHandler<T>;
-/**
- * Name: objectToKeyVal
- * Description: Recursively converts an object to key=val string
- * @public
- * @param obj
- * @param options
- * @returns string
- */
-declare const objectToKeyVal: (obj: AnyObject, options?: keyValObjOptions<string[]>) => string;
+declare const lineCommentRegEx: RegExp;
 /**
  * Name: objectToSearchParams
  * Description: converts 2 level deep object to key=val string
@@ -1658,6 +1624,13 @@ type randomStringOptions = {
 };
 declare const randomString: (length?: number, { prefix, filterRegex }?: randomStringOptions) => string;
 /**
+ * Name: removeComments
+ * Description: remove line and block comments from strings
+ * @param str String to parse
+ * @returns string that has been filtered
+ */
+declare const removeComments: (str: string) => string;
+/**
  * Name: removeWhitespace
  * Description: Normalizes whitespsace in a string
  * @public
@@ -1673,25 +1646,6 @@ declare const removeWhitespace: (str: string) => string;
  * @returns Record<any, any>
  */
 declare const searchParamsToObject: (searchParams: URLSearchParams) => AnyObject<any>;
-/**
- * Name: blockCommentRegEx
- * Description: Regex that removes block comments
- * @public
- */
-declare const blockCommentRegEx: RegExp;
-/**
- * Name: lineCommentRegEx
- * Description: Regex that removes line comments
- * @public
- */
-declare const lineCommentRegEx: RegExp;
-/**
- * Name: stripComments
- * Description: remove line and block comments from strings
- * @param str String to parse
- * @returns string that has been filtered
- */
-declare const stripComments: (str: string) => string;
 /**
  * Name: updateConstObject
  * Description: Used for updating each property on a const initialized object as reassignment is not allowed eg: spread operator or Object.assign
@@ -1801,4 +1755,4 @@ declare class URLManager extends URL {
     set params(data: AnyObject);
 }
 
-export { ApiFactory, ApiRecord, AppliedMiddlewareFactory, AttributionReportingOptions, CACHE_ACTIONS, Cache, Console, CreateResourceParams, Decorator, DecoratorCallback, DecoratorCallbackParams, DecoratorReturnType, FetchParams, GlobalResource, HTTPCLIENT_ACTIONS, HTTPMethodValues, HTTPMethods, History, HistoryController, HttpClient, HttpClientParams, LOGGER_ACTIONS, LineOptions, LogLevel, LogRecord, Logger, MATCHER_ACTIONS, MapCache, Middleware, MiddlewareParams, Reducer, ReducerAction, ReducerCollection, RequestBody, RequestInit, RequestPriority, Resource, ResourceController, STORE_ACTIONS, Store, TransformMiddleware, URLManager, UncurriedMiddleware, applyMiddleware, arrayContentsRegex, blockCommentRegEx, clamp, clientFactory, colorCode, colorCodes, colorEscapeCodes, index as combinators, compose$1 as compose, createClassDecorator, createClassHandler, createClassMemberDecorator, createClassMethodHandler, createClassParameterHandler, createClassPropertyHandler, createDecorator, createHistory, createHistoryController, createHttpClient, createLogger, createMapCache, createMatcher, createMatcherProxyHandler, createMiddlewareApi, createNamespacedRecord, createProxiedMatchTarget, createProxiedMatcher, createProxy, createReducer, createResource, createStore, createTextResource, createTimeStamp, enumToArray, fakeUuid, filterUndefinedFromObject, hexToUtf, interpolate, isNode, jsonObjectCopy, jsonStringToPrimitiveType, keyValToObject, lineCommentRegEx, mountRootComponent, objectToKeyVal, objectToSearchParams, passthroughCreateApi, passthroughMiddleware, passthroughSort, passthroughTransform, primitiveToJsonString, randomHexString, randomInteger, randomString, removeWhitespace, searchParamsToObject, stripComments, updateConstObject, utfToHex };
+export { Action, AnyObject, ApiFactory, ApiRecord, AppliedMiddlewareFactory, ArrowFunction, AsyncArrowFunction, AsyncConstructorFunction, AttributionReportingOptions, CACHE_ACTIONS, Cache, Callable, CompareFunction, Console, Constructable, ConstructorFunction, CreateResourceParams, Decorator, DecoratorCallback, DecoratorCallbackParams, DecoratorReturnType, FetchParams, GlobalResource, HTTPCLIENT_ACTIONS, HTTPMethodValues, HTTPMethods, Handler, History, HistoryController, HttpClient, HttpClientParams, InlineBlocks, Json, JsonObject, LOGGER_ACTIONS, LineOptions, Listener, LogLevel, LogRecord, Logger, MATCHER_ACTIONS, MapCache, MapHashKey, Middleware, MiddlewareParams, MimeType, NumericRange, ObjectKey, Operator, ReduceFunction, Reducer, ReducerAction, ReducerCollection, RequestBody, RequestInit, RequestPriority, Resource, ResourceController, STORE_ACTIONS, State, Store, TagFunction, TaggedFunctionStrings, TransformMiddleware, TruncateString, TypedArray, URLManager, UncurriedMiddleware, applyMiddleware, arrayContentsRegex, blockCommentRegEx, clamp, clientFactory, colorCode, colorCodes, colorEscapeCodes, index as combinators, compose$1 as compose, createClassDecorator, createClassHandler, createClassMemberDecorator, createClassMethodHandler, createClassParameterHandler, createClassPropertyHandler, createDecorator, createHistory, createHistoryController, createHttpClient, createLogger, createMapCache, createMatcher, createMatcherProxyHandler, createMiddlewareApi, createNamespacedRecord, createProxiedMatchTarget, createProxiedMatcher, createProxy, createReducer, createResource, createStore, createTextResource, createTimeStamp, enumToArray, fakeUuid, filterUndefinedFromObject, hexToUtf, interpolate, isNode, jsonObjectCopy, lineCommentRegEx, mountRootComponent, objectToSearchParams, passthroughCreateApi, passthroughMiddleware, passthroughSort, passthroughTransform, randomHexString, randomInteger, randomString, removeComments, removeWhitespace, searchParamsToObject, updateConstObject, utfToHex };
